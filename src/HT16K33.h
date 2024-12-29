@@ -24,7 +24,7 @@
 
 // const char i2cip_ht16k33_id_progmem[] PROGMEM = {"HT16K33"};
 
-typedef enum { 7SEG_BLANK, 7SEG_HEX32, 7SEG_UINT, 7SEG_INT, 7SEG_STR4, 7SEG_1F, 7SEG_2F, 7SEG_3F } i2cip_ht16k33_mode_t; // Implies sizes {4 byte uint32, 2 byte uint8_t, 2 byte int16_t, char s[4], float...} with different precisions
+typedef enum { 7SEG_BLANK = 0, 7SEG_HEX32, 7SEG_UINT, 7SEG_INT, 7SEG_STR4, 7SEG_1F, 7SEG_2F, 7SEG_3F } i2cip_ht16k33_mode_t; // Implies sizes {4 byte uint32, 2 byte uint8_t, 2 byte int16_t, char s[4], float...} with different precisions
 
 // union type for 7-segment display data for each mode
 typedef union {
@@ -48,7 +48,7 @@ class HT16K33 : public I2CIP::Device, public I2CIP::OutputInterface<i2cip_ht16k3
     // HT16K33(i2cip_fqa_t fqa) : I2CIP::Device(fqa, i2cip_ht16k33_id_progmem, _id), I2CIP::OutputInterface<uint8_t*, size_t>((I2CIP::Device*)this) { }
     HT16K33(i2cip_fqa_t fqa, const i2cip_id_t& id);
 
-    i2cip_ht16k33_data_t segmentMaps = 0x00000000; // All off 32-bit
+    i2cip_ht16k33_data_t segmentMaps = (uint32_t)0; // All off 32-bit
 
     bool initialized = false;
 
@@ -96,6 +96,7 @@ class HT16K33 : public I2CIP::Device, public I2CIP::OutputInterface<i2cip_ht16k3
   public:
     // HT16K33(i2cip_fqa_t fqa, const i2cip_id_t& id); // Moved to private; See I2CIP_HT16K33_ADDRESS note comment
     HT16K33(uint8_t wire, uint8_t mux, uint8_t bus, const i2cip_id_t& id) : HT16K33(createFQA(wire, mux, bus, I2CIP_HT16K33_ADDRESS), id) { }
+    HT16K33(uint8_t wire, const i2cip_id_t& id) : HT16K33(createFQA(wire, I2CIP_MUX_NUM_FAKE, I2CIP_MUX_BUS_FAKE, I2CIP_HT16K33_ADDRESS), id) { }
 
     i2cip_errorlevel_t set(i2cip_ht16k33_data_t const& buf, const i2cip_ht16k33_mode_t& mode) override;
 };
