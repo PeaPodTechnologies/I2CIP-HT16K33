@@ -41,18 +41,18 @@ char hexChar(uint8_t hex) {
 }
 
 // Takes 4 
-class HT16K33 : public I2CIP::Device, public I2CIP::OutputInterface<i2cip_ht16k33_data_t*, i2cip_ht16k33_mode_t> {
+class HT16K33 : public I2CIP::Device, public I2CIP::OutputInterface<i2cip_ht16k33_data_t, i2cip_ht16k33_mode_t> {
   I2CIP_DEVICE_CLASS_BUNDLE(HT16K33);
-  I2CIP_OUTPUT_USE_FAILSAFE(i2cip_ht16k33_data_t*, i2cip_ht16k33_mode_t);
+  I2CIP_OUTPUT_USE_FAILSAFE(i2cip_ht16k33_data_t, i2cip_ht16k33_mode_t);
   private:
     // HT16K33(i2cip_fqa_t fqa) : I2CIP::Device(fqa, i2cip_ht16k33_id_progmem, _id), I2CIP::OutputInterface<uint8_t*, size_t>((I2CIP::Device*)this) { }
     HT16K33(i2cip_fqa_t fqa, const i2cip_id_t& id);
 
-    uint8_t segmentMaps[4] = { 0x00, 0x00, 0x00, 0x00 }; // All off
+    i2cip_ht16k33_data_t segmentMaps = 0x00000000; // All off 32-bit
 
     bool initialized = false;
 
-    template <i2cip_ht16k33_mode_t M> void setSegments(i2cip_ht16k33_data_t* const& buf, bool overwrite = true);
+    template <i2cip_ht16k33_mode_t M> void setSegments(i2cip_ht16k33_data_t const& buf, bool overwrite = true);
 
     i2cip_errorlevel_t clear(bool setbus = false) {
       uint8_t buffer[16] = { 0x00 };
@@ -97,7 +97,7 @@ class HT16K33 : public I2CIP::Device, public I2CIP::OutputInterface<i2cip_ht16k3
     // HT16K33(i2cip_fqa_t fqa, const i2cip_id_t& id); // Moved to private; See I2CIP_HT16K33_ADDRESS note comment
     HT16K33(uint8_t wire, uint8_t mux, uint8_t bus, const i2cip_id_t& id) : HT16K33(createFQA(wire, mux, bus, I2CIP_HT16K33_ADDRESS), id) { }
 
-    i2cip_errorlevel_t set(i2cip_ht16k33_data_t* const& buf, const i2cip_ht16k33_mode_t& mode) override;
+    i2cip_errorlevel_t set(i2cip_ht16k33_data_t const& buf, const i2cip_ht16k33_mode_t& mode) override;
 };
 
 #endif

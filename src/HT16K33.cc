@@ -105,19 +105,20 @@ static const PROGMEM uint8_t ascii[] = {
 
 #define SEVENSEG_ASCII(c) pgm_read_byte(ascii + c + SEVENSEG_OFFSET_ASCII);
 #define SEVENSEG_NUMBER(x) pgm_read_byte(ascii + x + SEVENSEG_OFFSET_NUMERICAL);
-#define SEVENSEG_SET_ASCII(n, c, o) {if(o) { segmentMaps[n] = SEVENSEG_ASCII(c); } else { segmentMaps[n] |= SEVENSEG_ASCII(c); }}
-#define SEVENSEG_SET_NUMBER(n, x, o) {if(o) { segmentMaps[n] = SEVENSEG_NUMBER(x); } else { segmentMaps[n] |= SEVENSEG_NUMBER(x); }}
+#define SEVENSEG_SET_ASCII(n, c, o) {if(o) { segmentMaps.b[n] = SEVENSEG_ASCII(c); } else { segmentMaps.b[n] |= SEVENSEG_ASCII(c); }}
+#define SEVENSEG_SET_NUMBER(n, x, o) {if(o) { segmentMaps.b[n] = SEVENSEG_NUMBER(x); } else { segmentMaps.b[n] |= SEVENSEG_NUMBER(x); }}
 #define SEVENSEG_BUFBREAK(buf) {if(buf == nullptr) { setSegments<7SEG_BLANK>(buf, true); return; }}
 
 I2CIP_DEVICE_INIT_STATIC_ID(HT16K33);
-I2CIP_OUTPUT_INIT_FAILSAFE(HT16K33, i2cip_ht16k33_data_t*, nullptr, size_t, (I2CIP_HT16K33_WIDTH * I2CIP_HT16K33_HEIGHT) / 8);
+I2CIP_OUTPUT_INIT_FAILSAFE(HT16K33, i2cip_ht16k33_data_t, ({'F','A','I','L'}), i2cip_ht16k33_mode_t, 7SEG_STR4);
+// I2CIP_OUTPUT_INIT_FAILSAFE(HT16K33, i2cip_ht16k33_data_t, 0, i2cip_ht16k33_mode_t, 7SEG_BLANK);
 
-HT16K33::HT16K33(i2cip_fqa_t fqa, const i2cip_id_t& id) : I2CIP::Device(fqa, id), I2CIP::OutputInterface<uint8_t*, size_t>((I2CIP::Device*)this) { }
+HT16K33::HT16K33(i2cip_fqa_t fqa, const i2cip_id_t& id) : I2CIP::Device(fqa, id), I2CIP::OutputInterface<i2cip_ht16k33_data_t, i2cip_ht16k33_mode_t>((I2CIP::Device*)this) { }
 
 // The first four are distinct (Hex, Leading-Spaces Signed, Leading-Zeroes Unsigned, ASCII String)
 // The last three handle floating point numbers with varying degrees of precision
 
-template <> void HT16K33::setSegments<7SEG_BLANK>(i2cip_ht16k33_data_t* const& buf, bool overwrite) {
+template <> void HT16K33::setSegments<7SEG_BLANK>(i2cip_ht16k33_data_t const& buf, bool overwrite) {
   if(!overwrite) return;
   SEVENSEG_SET_ASCII(0, ' ', true);
   SEVENSEG_SET_ASCII(1, ' ', true);
@@ -125,7 +126,7 @@ template <> void HT16K33::setSegments<7SEG_BLANK>(i2cip_ht16k33_data_t* const& b
   SEVENSEG_SET_ASCII(3, ' ', true);
 }
 
-template <> void HT16K33::setSegments<7SEG_HEX32>(i2cip_ht16k33_data_t* const& buf, bool overwrite) {
+template <> void HT16K33::setSegments<7SEG_HEX32>(i2cip_ht16k33_data_t const& buf, bool overwrite) {
   SEVENSEG_BUFBREAK(buf);
   for(uint8_t i = 0; i < 4; i++) {
     uint8_t hex = (buf->h >> (i * 8)) & 0xFF;
@@ -137,7 +138,7 @@ template <> void HT16K33::setSegments<7SEG_HEX32>(i2cip_ht16k33_data_t* const& b
   }
 }
 
-template <> void HT16K33::setSegments<7SEG_UINT>(i2cip_ht16k33_data_t* const& buf, bool overwrite) {
+template <> void HT16K33::setSegments<7SEG_UINT>(i2cip_ht16k33_data_t const& buf, bool overwrite) {
   SEVENSEG_BUFBREAK(buf);
   uint32_t _val = buf->h;
   // uint16_t val = (uint16_t)(_val > 9999 ? 1337 : _val); // Constrain
@@ -161,7 +162,7 @@ template <> void HT16K33::setSegments<7SEG_UINT>(i2cip_ht16k33_data_t* const& bu
   SEVENSEG_SET_NUMBER(3, ones, overwrite);
 }
 
-template <> void HT16K33::setSegments<7SEG_INT>(i2cip_ht16k33_data_t* const& buf, bool overwrite) {
+template <> void HT16K33::setSegments<7SEG_INT>(i2cip_ht16k33_data_t const& buf, bool overwrite) {
   SEVENSEG_BUFBREAK(buf);
   int32_t _val = buf->h; // Immediate sign conversion
   bool sign = _val < 0;
@@ -196,15 +197,19 @@ template <> void HT16K33::setSegments<7SEG_INT>(i2cip_ht16k33_data_t* const& buf
   SEVENSEG_SET_ASCII(p, '-', overwrite); // Set sign
 }
 
-template <> void HT16K33::setSegments<7SEG_4STR>(i2cip_ht16k33_data_t* const& buf, bool overwrite) {
+template <> void HT16K33::setSegments<7SEG_4STR>(i2cip_ht16k33_data_t const& buf, bool overwrite) {
   SEVENSEG_BUFBREAK(buf);
   for(uint8_t i = 0; i < 4; i++) {
     char c = buf->asci[i];
-    segmentMaps[i] = SEVENSEG_ASCII(c);
+    if(c == '\0') {
+      SEVENSEG_SET_ASCII(i, ' ', overwrite);
+    } else {
+      SEVENSEG_SET_ASCII(i, c, overwrite);
+    }
   }
 }
 
-template <> void HT16K33::setSegments<7SEG_1F>(i2cip_ht16k33_data_t* const& buf, bool overwrite) {
+template <> void HT16K33::setSegments<7SEG_1F>(i2cip_ht16k33_data_t const& buf, bool overwrite) {
   SEVENSEG_BUFBREAK(buf);
   float f = buf->f;
   if(f == NaN) {
@@ -217,22 +222,22 @@ template <> void HT16K33::setSegments<7SEG_1F>(i2cip_ht16k33_data_t* const& buf,
     SEVENSEG_SET_ASCII(1, 'E', overwrite);
     SEVENSEG_SET_ASCII(2, 'R', overwrite);
     SEVENSEG_SET_ASCII(3, 'R', overwrite);
-    segmentMaps[2] |= SEVENSEG_ASCII('.'); // Add decimal point
+    segmentMaps.b[2] |= SEVENSEG_ASCII('.'); // Add decimal point
   } else if(f <= -100.0) {
     SEVENSEG_SET_ASCII(0, '-', overwrite);
     SEVENSEG_SET_ASCII(1, 'E', overwrite);
     SEVENSEG_SET_ASCII(2, 'R', overwrite);
     SEVENSEG_SET_ASCII(3, 'R', overwrite);
-    segmentMaps[2] |= SEVENSEG_ASCII('.'); // Add decimal point
+    segmentMaps.b[2] |= SEVENSEG_ASCII('.'); // Add decimal point
   } else {
     // Good to go, use <int> to print the number
     uint32_t _val = (int16_t)(f * 10); // 1 decimal place
-    segmentMaps[2] = SEVENSEG_ASCII('.'); // Add decimal point
+    segmentMaps.b[2] = SEVENSEG_ASCII('.'); // Add decimal point
     setSegments<7SEG_INT>(_val, false); // No overwrite, leaves in the decimal point
   }
 }
 
-template <> void HT16K33::setSegments<7SEG_2F>(i2cip_ht16k33_data_t* const& buf, bool overwrite) {
+template <> void HT16K33::setSegments<7SEG_2F>(i2cip_ht16k33_data_t const& buf, bool overwrite) {
   SEVENSEG_BUFBREAK(buf);
   float f = buf->f;
   if(f == NaN) {
@@ -245,22 +250,22 @@ template <> void HT16K33::setSegments<7SEG_2F>(i2cip_ht16k33_data_t* const& buf,
     SEVENSEG_SET_ASCII(1, 'E', overwrite);
     SEVENSEG_SET_ASCII(2, 'R', overwrite);
     SEVENSEG_SET_ASCII(3, 'R', overwrite);
-    segmentMaps[1] |= SEVENSEG_ASCII('.'); // Add decimal point
+    segmentMaps.b[1] |= SEVENSEG_ASCII('.'); // Add decimal point
   } else if(f <= -10.0) {
     SEVENSEG_SET_ASCII(0, '-', overwrite);
     SEVENSEG_SET_ASCII(1, 'E', overwrite);
     SEVENSEG_SET_ASCII(2, 'R', overwrite);
     SEVENSEG_SET_ASCII(3, 'R', overwrite);
-    segmentMaps[1] |= SEVENSEG_ASCII('.'); // Add decimal point
+    segmentMaps.b[1] |= SEVENSEG_ASCII('.'); // Add decimal point
   } else {
     // Good to go, use <int> to print the number
     uint32_t _val = (int16_t)(f * 100); // 2 decimal places
-    segmentMaps[1] = SEVENSEG_ASCII('.'); // Add decimal point
+    segmentMaps.b[1] = SEVENSEG_ASCII('.'); // Add decimal point
     setSegments<7SEG_INT>(_val, false); // No overwrite, leaves in the decimal point
   }
 }
 
-template <> void HT16K33::setSegments<7SEG_3F>(i2cip_ht16k33_data_t* const& buf, bool overwrite) {
+template <> void HT16K33::setSegments<7SEG_3F>(i2cip_ht16k33_data_t const& buf, bool overwrite) {
   SEVENSEG_BUFBREAK(buf);
   float f = buf->f;
   if(f == NaN) {
@@ -273,22 +278,22 @@ template <> void HT16K33::setSegments<7SEG_3F>(i2cip_ht16k33_data_t* const& buf,
     SEVENSEG_SET_ASCII(1, 'E', overwrite);
     SEVENSEG_SET_ASCII(2, 'R', overwrite);
     SEVENSEG_SET_ASCII(3, 'R', overwrite);
-    segmentMaps[0] |= SEVENSEG_ASCII('.'); // Add decimal point
+    segmentMaps.b[0] |= SEVENSEG_ASCII('.'); // Add decimal point
   } else if(f <= -1.0) {
     SEVENSEG_SET_ASCII(0, '-', overwrite);
     SEVENSEG_SET_ASCII(1, 'E', overwrite);
     SEVENSEG_SET_ASCII(2, 'R', overwrite);
     SEVENSEG_SET_ASCII(3, 'R', overwrite);
-    segmentMaps[0] |= SEVENSEG_ASCII('.'); // Add decimal point
+    segmentMaps.b[0] |= SEVENSEG_ASCII('.'); // Add decimal point
   } else {
     // Good to go, use <int> to print the number
     uint32_t _val = (int16_t)(f * 1000); // 3 decimal places
     setSegments<7SEG_INT>(_val, overwrite); // No overwrite, leaves in the decimal point
-    segmentMaps[0] = SEVENSEG_ASCII('.'); // Add decimal point
+    segmentMaps.b[0] = SEVENSEG_ASCII('.'); // Add decimal point
   }
 }
 
-i2cip_errorlevel_t HT16K33::set(i2cip_ht16k33_data_t* const& buf, const i2cip_ht16k33_mode_t& mode) {
+i2cip_errorlevel_t HT16K33::set(i2cip_ht16k33_data_t const& buf, const i2cip_ht16k33_mode_t& mode) {
   if(!initialized) {
     // i2cip_errorlevel_t errlev = begin(true);
     i2cip_errorlevel_t errlev = begin();
@@ -305,9 +310,9 @@ i2cip_errorlevel_t HT16K33::set(i2cip_ht16k33_data_t* const& buf, const i2cip_ht
   // displaybuffer[d] = (font | ((uint8_t)dot << 7));
 
   // Convert to 
-  uint8_t buffer[8] = { segmentMaps[0], 0x00, segmentMaps[1], 0x00, segmentMaps[2], 0x00, segmentMaps[3], 0x00 };
+  uint8_t buffer[8] = { segmentMaps.b[0], 0x00, segmentMaps.b[1], 0x00, segmentMaps.b[2], 0x00, segmentMaps.b[3], 0x00 };
   return writeRegister((uint8_t)(0x00), buffer, 8, false);
 
-  // uint8_t buffer[4] = { segmentMaps[0], segmentMaps[1], segmentMaps[2], segmentMaps[3] };
+  // uint8_t buffer[4] = { segmentMaps.b[0], segmentMaps.b[1], segmentMaps.b[2], segmentMaps.b[3] };
   // return writeRegister((uint8_t)(0x00), buffer, 4, false);
 }
