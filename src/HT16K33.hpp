@@ -19,7 +19,7 @@
 #define HT16K33_CMD_OSCILLATOR 0x21 // Turn on oscillator
 
 // #define I2CIP_HT16K33_ADDRESS 0x70 /// default I2C address for HT16K33; interferes with MUX range 0x70-0x77; instead we "fake-out" 0x77 MUX devices
-#define I2CIP_HT16K33_ADDRESS 0x77 // I2CIP-supported address (MUX with this addr are "faked-out" by the library)
+#define I2CIP_HT16K33_ADDRESS 119 // 0x77; I2CIP-supported address (MUX with this addr are "faked-out" by the library)
 #define I2CIP_HT16K33_7SEGNUM 4 ///< # Digits in 7-seg displays
 
 // const char i2cip_ht16k33_id_progmem[] PROGMEM = {"HT16K33"};

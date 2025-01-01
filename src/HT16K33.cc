@@ -2,6 +2,10 @@
 
 // #include <debug.h>
 
+#ifndef I2CIP_H_
+#error "I2CIP must be in I2CIP-HT16K33/libs, or, adjacent to I2CIP-HT16K33 together in $PWD/libs"
+#else
+
 static const PROGMEM uint8_t ascii[] = {
 
     0b00000000, // (space) - Ascii 32 at index 0; See SEVENSEG_OFFSET_ASCII
@@ -513,12 +517,12 @@ i2cip_errorlevel_t HT16K33::writeSegments(bool setbus) {
 
 i2cip_errorlevel_t HT16K33::set(i2cip_ht16k33_data_t const& buf, const i2cip_ht16k33_mode_t& mode) {
   i2cip_errorlevel_t errlev = I2CIP_ERR_NONE;
-  if(this->initialized == false) {
+  // if(this->initialized == false) {
     // i2cip_errorlevel_t errlev = begin(true);
     errlev = this->begin();
     I2CIP_ERR_BREAK(errlev);
-    this->initialized = true;
-  }
+    // this->initialized = true;
+  // }
 
   #ifdef I2CIP_DEBUG_SERIAL
     I2CIP_DEBUG_SERIAL.print(F("7SEG SET @0x"));
@@ -558,3 +562,5 @@ i2cip_errorlevel_t HT16K33::set(i2cip_ht16k33_data_t const& buf, const i2cip_ht1
 
   return blink(HT16K33_BLINK_OFF, false);
 }
+
+#endif
