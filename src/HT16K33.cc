@@ -1,6 +1,6 @@
 #include "HT16K33.hpp"
 
-#include <debug.h>
+// #include <debug.h>
 
 static const PROGMEM uint8_t ascii[] = {
 
