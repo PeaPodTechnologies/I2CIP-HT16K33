@@ -1,5 +1,7 @@
 #include "HT16K33.hpp"
 
+#include <debug.h>
+
 static const PROGMEM uint8_t ascii[] = {
 
     0b00000000, // (space) - Ascii 32 at index 0; See SEVENSEG_OFFSET_ASCII
@@ -227,7 +229,9 @@ char parseSevenSegments(uint8_t b) {
 I2CIP_DEVICE_INIT_STATIC_ID(HT16K33);
 I2CIP_OUTPUT_INIT_FAILSAFE(HT16K33, i2cip_ht16k33_data_t, SEVENSEG_FAILSAFE, i2cip_ht16k33_mode_t, SEG_ASCII);
 
-HT16K33::HT16K33(i2cip_fqa_t fqa, const i2cip_id_t& id) : I2CIP::Device(fqa, id), I2CIP::OutputInterface<i2cip_ht16k33_data_t, i2cip_ht16k33_mode_t>((I2CIP::Device*)this) { }
+using namespace I2CIP;
+
+HT16K33::HT16K33(i2cip_fqa_t fqa, const i2cip_id_t& id) : Device(fqa, id), OutputInterface<i2cip_ht16k33_data_t, i2cip_ht16k33_mode_t>((Device*)this) { }
 
 // char hexChar(uint8_t hex) {
 //   hex &= 0x0F;
@@ -454,7 +458,7 @@ template <> void HT16K33::setSegments<SEG_3F>(i2cip_ht16k33_data_t buf, bool ove
 }
 
 i2cip_errorlevel_t HT16K33::blink(uint8_t b, bool setbus) {
-  if (b > HT16K33_BLINK_HALFHZ) return I2CIP::I2CIP_ERR_SOFT;
+  if (b > HT16K33_BLINK_HALFHZ) return I2CIP_ERR_SOFT;
 
   return writeByte(HT16K33_REG_BLINK | HT16K33_DISPLAY_ON | (b << 1), setbus);
 }
@@ -508,12 +512,12 @@ i2cip_errorlevel_t HT16K33::writeSegments(bool setbus) {
 }
 
 i2cip_errorlevel_t HT16K33::set(i2cip_ht16k33_data_t const& buf, const i2cip_ht16k33_mode_t& mode) {
-  i2cip_errorlevel_t errlev = I2CIP::I2CIP_ERR_NONE;
+  i2cip_errorlevel_t errlev = I2CIP_ERR_NONE;
   if(this->initialized == false) {
     // i2cip_errorlevel_t errlev = begin(true);
     errlev = this->begin();
     I2CIP_ERR_BREAK(errlev);
-    // this->initialized = true;
+    this->initialized = true;
   }
 
   #ifdef I2CIP_DEBUG_SERIAL
@@ -550,7 +554,7 @@ i2cip_errorlevel_t HT16K33::set(i2cip_ht16k33_data_t const& buf, const i2cip_ht1
   // displaybuffer[d] = (font | ((uint8_t)dot << 7));
 
   errlev = writeSegments(false);
-  I2CIP_ERR_BREAK(errlev);
+  if(errlev != I2CIP_ERR_NONE) { this->initialized = false; return errlev; }
 
   return blink(HT16K33_BLINK_OFF, false);
 }
