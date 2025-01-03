@@ -394,7 +394,7 @@ template <> void HT16K33::setSegments<SEG_1F>(i2cip_ht16k33_data_t buf, bool ove
     SEVENSEG_SET_ASCII(3, 'R', true);
   } else {
     // Good to go, use <int> to print the number
-    int32_t val = (f * 10); // Shift 1 decimal place
+    int32_t val = roundf(f * 10); // Shift 1 decimal place
     i2cip_ht16k33_data_t _buf = {(uint32_t)val};
     setSegments<SEG_INT>(_buf, overwrite); // No overwrite, leaves in the decimal point
   }
@@ -424,7 +424,7 @@ template <> void HT16K33::setSegments<SEG_2F>(i2cip_ht16k33_data_t buf, bool ove
     SEVENSEG_SET_ASCII(3, 'R', true);
   } else {
     // Good to go, use <int> to print the number
-    int32_t val = (f * 100); // Shift 1 decimal place
+    int32_t val = roundf(f * 100); // Shift 1 decimal place
     i2cip_ht16k33_data_t _buf = {(uint32_t)val};
     setSegments<SEG_INT>(_buf, overwrite); // No overwrite, leaves in the decimal point
   }
@@ -454,7 +454,7 @@ template <> void HT16K33::setSegments<SEG_3F>(i2cip_ht16k33_data_t buf, bool ove
     SEVENSEG_SET_ASCII(3, 'R', true);
   } else {
     // Good to go, use <int> to print the number
-    int32_t val = (f * 1000); // Shift 1 decimal place
+    int32_t val = roundf(f * 1000); // Shift 1 decimal place
     i2cip_ht16k33_data_t _buf = {(uint32_t)val};
     setSegments<SEG_INT>(_buf, overwrite); // No overwrite, leaves in the decimal point
   }
