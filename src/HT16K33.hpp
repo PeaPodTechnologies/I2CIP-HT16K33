@@ -32,13 +32,13 @@ typedef enum i2cip_ht16k33_mode_s {
   SEG_ASCII, // char s[4]; no null-terminator
   SEG_1F, // float, XXX.X
   SEG_2F, // XX.XX
-  SEG_3F // XXX.X
+  SEG_3F, // XXX.X
+  SEG_SNAKE // Easter egg
 } i2cip_ht16k33_mode_t; // Implies sizes {, , , char s[4], float...} with different precisions
 
 // union type for 7-segment display data for each mode
 typedef union {
   uint32_t h; // 4 bytes; cast to int32_t
-  char c[4];
   float f; // Also 4 bytes
 } i2cip_ht16k33_data_t; // h, b, s
 
@@ -52,24 +52,28 @@ class HT16K33 : public I2CIP::Device, public I2CIP::OutputInterface<i2cip_ht16k3
 
     uint32_t segmentMaps = 0; // All off
 
-    bool initialized = false;
-
     template <i2cip_ht16k33_mode_t M> void setSegments(i2cip_ht16k33_data_t buf, bool overwrite = true);
 
-    i2cip_errorlevel_t blink(uint8_t b = HT16K33_BLINK_OFF, bool setbus = false);
+    i2cip_errorlevel_t blink(const uint8_t& b = HT16K33_BLINK_OFF, bool setbus = false);
 
-    i2cip_errorlevel_t brightness(uint8_t b = 15, bool setbus = false);
+    i2cip_errorlevel_t brightness(const uint8_t& b = 15, bool setbus = false);
 
-    i2cip_errorlevel_t begin(bool setbus = false);
+    i2cip_errorlevel_t begin(bool setbus = true) override; // virtual Device::begin
 
     i2cip_errorlevel_t writeSegments(bool setbus = false);
 
   public:
     // HT16K33(i2cip_fqa_t fqa, const i2cip_id_t& id); // Moved to private; See I2CIP_HT16K33_ADDRESS note comment
-    HT16K33(uint8_t wire, uint8_t mux, uint8_t bus, const i2cip_id_t& id) : HT16K33(I2CIP::createFQA(wire, mux, bus, I2CIP_HT16K33_ADDRESS), id) { }
-    HT16K33(uint8_t wire, const i2cip_id_t& id) : HT16K33(I2CIP::createFQA(wire, I2CIP_MUX_NUM_FAKE, I2CIP_MUX_BUS_FAKE, I2CIP_HT16K33_ADDRESS), id) { }
+    HT16K33(const uint8_t& wire, const uint8_t& mux, const uint8_t& bus, const i2cip_id_t& id) : HT16K33(I2CIP::createFQA(wire, mux, bus, I2CIP_HT16K33_ADDRESS), id) { }
+    HT16K33(const uint8_t& wire, const i2cip_id_t& id) : HT16K33(I2CIP::createFQA(wire, I2CIP_MUX_NUM_FAKE, I2CIP_MUX_BUS_FAKE, I2CIP_HT16K33_ADDRESS), id) { }
 
     i2cip_errorlevel_t set(i2cip_ht16k33_data_t const& buf, const i2cip_ht16k33_mode_t& mode) override;
+
+    // Static API
+    static i2cip_errorlevel_t _begin(const i2cip_fqa_t& fqa, bool setbus); // Passed to Device::Device()
+    static i2cip_errorlevel_t _writeSegments(const i2cip_fqa_t& fqa, const uint32_t& segments, bool setbus);
+    static i2cip_errorlevel_t _brightness(const i2cip_fqa_t& fqa, const uint8_t& b, bool setbus);
+    static i2cip_errorlevel_t _blink(const i2cip_fqa_t& fqa, const uint8_t& b, bool setbus);
 };
 
 #endif

@@ -6,6 +6,8 @@
 #error "I2CIP must be in I2CIP-HT16K33/libs, or, adjacent to I2CIP-HT16K33 together in $PWD/libs"
 #else
 
+uint32_t __easteregg = 0;
+
 static const PROGMEM uint8_t ascii[] = {
 
     0b00000000, // (space) - Ascii 32 at index 0; See SEVENSEG_OFFSET_ASCII
@@ -227,14 +229,15 @@ char parseSevenSegments(uint8_t b) {
   if(o) { SEVENSEG_SET_BLANK((n)); } \
   SEVENSEG_SET_BYTE((n), (pgm_read_byte_near(ascii + (x) + (SEVENSEG_OFFSET_NUMERICAL))));
 
-// #define SEVENSEG_FAILSAFE {0x4C494146} // "FAIL" without null terminator
-#define SEVENSEG_FAILSAFE { .c = {'F', 'A', 'I', 'L'}} // "FAIL" without null terminator
+#define SEVENSEG_FAILSAFE {0x4C494146} // "FAIL" without null terminator
+// #define SEVENSEG_FAILSAFE { .c = {'F', 'A', 'I', 'L'}} // "FAIL" without null terminator
 
 I2CIP_DEVICE_INIT_STATIC_ID(HT16K33);
 I2CIP_OUTPUT_INIT_FAILSAFE(HT16K33, i2cip_ht16k33_data_t, SEVENSEG_FAILSAFE, i2cip_ht16k33_mode_t, SEG_ASCII);
 
 using namespace I2CIP;
 
+// use begin
 HT16K33::HT16K33(i2cip_fqa_t fqa, const i2cip_id_t& id) : Device(fqa, id), OutputInterface<i2cip_ht16k33_data_t, i2cip_ht16k33_mode_t>((Device*)this) { }
 
 // char hexChar(uint8_t hex) {
@@ -295,9 +298,9 @@ template <> void HT16K33::setSegments<SEG_UINT>(i2cip_ht16k33_data_t buf, bool o
   }
 
   uint8_t thousands = val > 1000 ? val / 1000 : 0;
-  uint8_t hundreds = val > 100 ? val / 100 : 0;
-  uint8_t tens = val > 10 ? (val - (hundreds * 100)) / 10 : 0;
-  uint8_t ones = val - hundreds * 100 - tens * 10;
+  uint8_t hundreds = val > 100 ? (val - (thousands * 1000)) / 100 : 0;
+  uint8_t tens = val > 10 ? (val - (thousands * 1000) - (hundreds * 100)) / 10 : 0;
+  uint8_t ones = val - (thousands * 1000) - (hundreds * 100) - (tens * 10);
 
   // if the second byte is non-zero, display a minus sign - because why not? - otherwise a space
   SEVENSEG_SET_NUMBER(0, thousands, overwrite);
@@ -333,9 +336,9 @@ template <> void HT16K33::setSegments<SEG_INT>(i2cip_ht16k33_data_t buf, bool ov
   val = abs(val);
 
   uint8_t thousands = sign ? 0 : (val > 1000 ? val / 1000 : 0);
-  uint8_t hundreds = val > 100 ? val / 100 : 0;
-  uint8_t tens = val > 10 ? (val - (hundreds * 100)) / 10 : 0;
-  uint8_t ones = val - hundreds * 100 - tens * 10;
+  uint8_t hundreds = val > 100 ? (val - (thousands * 1000)) / 100 : 0;
+  uint8_t tens = val > 10 ? (val - (thousands * 1000) - (hundreds * 100)) / 10 : 0;
+  uint8_t ones = val - (thousands * 1000) - (hundreds * 100) - (tens * 10);
 
   // if the second byte is non-zero, display a minus sign - because why not? - otherwise a space
   uint8_t p = 0; // Sign placement
@@ -358,12 +361,11 @@ template <> void HT16K33::setSegments<SEG_INT>(i2cip_ht16k33_data_t buf, bool ov
 template <> void HT16K33::setSegments<SEG_ASCII>(i2cip_ht16k33_data_t buf, bool overwrite) {
   // SEVENSEG_BUFBREAK(buf);
   for(uint8_t i = 0; i < 4; i++) {
-    // char c = ((buf.h >> (i * 8)) & 0xFF); // Extract byte
-    char c = buf.c[i];
+    char c = ((buf.h >> (i * 8)) & 0xFF); // Extract byte
     #ifdef I2CIP_DEBUG_SERIAL
       I2CIP_DEBUG_SERIAL.print(c);
     #endif
-    c = constrain(c, ' ', '~'); // Constrain to printable ASCII
+    if(c > '~' || c < ' ') { c = ' '; } // Out of range, set to space
     SEVENSEG_SET_ASCII(i, c, overwrite);
   }
   #ifdef I2CIP_DEBUG_SERIAL
@@ -461,39 +463,46 @@ template <> void HT16K33::setSegments<SEG_3F>(i2cip_ht16k33_data_t buf, bool ove
   SEVENSEG_SET_ASCII(0, '.', false); // Add decimal point
 }
 
-i2cip_errorlevel_t HT16K33::blink(uint8_t b, bool setbus) {
+i2cip_errorlevel_t HT16K33::blink(const uint8_t& b, bool setbus) { return HT16K33::_blink(this->getFQA(), b, setbus); }
+i2cip_errorlevel_t HT16K33::_blink(const i2cip_fqa_t& fqa, const uint8_t& b, bool setbus) {
   if (b > HT16K33_BLINK_HALFHZ) return I2CIP_ERR_SOFT;
 
-  return writeByte(HT16K33_REG_BLINK | HT16K33_DISPLAY_ON | (b << 1), setbus);
+  return Device::writeByte(fqa, HT16K33_REG_BLINK | HT16K33_DISPLAY_ON | (b << 1), setbus);
 }
 
-i2cip_errorlevel_t HT16K33::brightness(uint8_t b, bool setbus) {
-  if(b > 15) b = 15;
+i2cip_errorlevel_t HT16K33::brightness(const uint8_t& b, bool setbus) { return HT16K33::_brightness(this->getFQA(), b, setbus); }
+i2cip_errorlevel_t HT16K33::_brightness(const i2cip_fqa_t& fqa, const uint8_t& _b, bool setbus) {
+  uint8_t b = _b > 0xF ? 0xF : _b;
 
-  return writeByte(HT16K33_REG_BRIGHTNESS | b, setbus);
+  return Device::writeByte(fqa, HT16K33_REG_BRIGHTNESS | b, setbus);
 }
 
-i2cip_errorlevel_t HT16K33::begin(bool setbus) {
-  // Serial.println(F("7SEG BEGIN"));
+i2cip_errorlevel_t HT16K33::begin(bool setbus) { return HT16K33::_begin(this->getFQA(), setbus); }
+
+i2cip_errorlevel_t HT16K33::_begin(const i2cip_fqa_t& fqa, bool setbus) {
+  #ifdef I2CIP_DEBUG_SERIAL
+    I2CIP_DEBUG_SERIAL.println(F("7SEG BEGIN"));
+  #endif
 
   // Oscillator
-  i2cip_errorlevel_t errlev = writeByte(HT16K33_CMD_OSCILLATOR, setbus); // 0x21 = 0b00100001
+  i2cip_errorlevel_t errlev = Device::writeByte(fqa, HT16K33_CMD_OSCILLATOR, setbus); // 0x21 = 0b00100001
   I2CIP_ERR_BREAK(errlev);
 
   // Attempt blank TX
-  setSegments<SEG_BLANK>({0}, true);
-  errlev = writeSegments();
+  errlev = HT16K33::_writeSegments(fqa, 0x00000000, false);
   I2CIP_ERR_BREAK(errlev);
 
   // Blink Off
-  errlev = blink(HT16K33_BLINK_OFF);
+  errlev = HT16K33::_blink(fqa, HT16K33_BLINK_OFF, false);
   I2CIP_ERR_BREAK(errlev);
 
   // Turn On
-  return brightness();
+  return HT16K33::_brightness(fqa, 0xF, false);
 }
 
-i2cip_errorlevel_t HT16K33::writeSegments(bool setbus) {
+i2cip_errorlevel_t HT16K33::writeSegments(bool setbus) { return HT16K33::_writeSegments(this->getFQA(), this->segmentMaps, setbus); }
+
+i2cip_errorlevel_t HT16K33::_writeSegments(const i2cip_fqa_t& fqa, const uint32_t& segments, bool setbus) {
   // Typically, segmentMaps would be uint16_t[8] and we'd store in the 8 LSB of the first 4 words
   // Then, when writing, we'd write all 16 bytes to the device
   // As so:
@@ -504,26 +513,26 @@ i2cip_errorlevel_t HT16K33::writeSegments(bool setbus) {
   // So here, we interleave zeroes in the uint16_t MSB positions: uint8_t [0, 2, ...]
   // and place our bytes in the LSB positions: uint8_t [1, 3, ...]
   uint8_t buffer[0xF] = { 0x00 };
-  buffer[0] = (uint8_t)(this->segmentMaps & 0xFF);
+  buffer[0] = (uint8_t)(segments & 0xFF);
   // buffer[1] = (uint8_t)(this->segmentMaps & 0xFF);
-  buffer[2] = (uint8_t)((this->segmentMaps >> 8) & 0xFF);
+  buffer[2] = (uint8_t)((segments >> 8) & 0xFF);
   // buffer[3] = (uint8_t)((this->segmentMaps >> 8) & 0xFF);
-  buffer[6] = (uint8_t)((this->segmentMaps >> 16) & 0xFF);
+  buffer[6] = (uint8_t)((segments >> 16) & 0xFF);
   // buffer[5] = (uint8_t)((this->segmentMaps >> 16) & 0xFF);
-  buffer[8] = (uint8_t)((this->segmentMaps >> 24) & 0xFF);
+  buffer[8] = (uint8_t)((segments >> 24) & 0xFF);
   // buffer[7] = (uint8_t)((this->segmentMaps >> 24) & 0xFF);
-  return writeRegister((uint8_t)(0x00), buffer, 0xF, setbus);
+  return Device::writeRegister(fqa, (uint8_t)(0x00), buffer, 0xF, setbus);
 }
 
 i2cip_errorlevel_t HT16K33::set(i2cip_ht16k33_data_t const& buf, const i2cip_ht16k33_mode_t& mode) {
   i2cip_errorlevel_t errlev = I2CIP_ERR_NONE;
-  // if(this->initialized == false) {
-    // i2cip_errorlevel_t errlev = begin(true);
-    errlev = this->begin();
-    I2CIP_ERR_BREAK(errlev);
-    // this->initialized = true;
+  // if(!this->ready) {
+  //   errlev = this->begin();
+  //   I2CIP_ERR_BREAK(errlev);
   // }
-
+  if(!this->ready) {
+    return I2CIP_ERR_SOFT;
+  }
   #ifdef I2CIP_DEBUG_SERIAL
     I2CIP_DEBUG_SERIAL.print(F("7SEG SET @0x"));
     I2CIP_DEBUG_SERIAL.print((uintptr_t)&buf, HEX);
@@ -536,30 +545,40 @@ i2cip_errorlevel_t HT16K33::set(i2cip_ht16k33_data_t const& buf, const i2cip_ht1
       case SEG_1F: I2CIP_DEBUG_SERIAL.print(".1FLOAT "); break;
       case SEG_2F: I2CIP_DEBUG_SERIAL.print(".2FLOAT "); break;
       case SEG_3F: I2CIP_DEBUG_SERIAL.print(".3FLOAT "); break;
+      case SEG_SNAKE: I2CIP_DEBUG_SERIAL.print("SNAKE "); break;
       default: I2CIP_DEBUG_SERIAL.print("BLANK "); break;
     }
   #endif
 
   // if(buf == nullptr) return brightness(0x00);
 
-  // SEG_HEX16, SEG_UINT, SEG_INT, SEG_ASCII, SEG_1F, SEG_2F, SEG_3F
-  // u32 h, u8 b[4], char s[4], float f
-  switch(mode) {
-    case SEG_HEX16: setSegments<SEG_HEX16>(buf, true); break;
-    case SEG_UINT: setSegments<SEG_UINT>(buf, true); break;
-    case SEG_INT: setSegments<SEG_INT>(buf, true); break;
-    case SEG_ASCII: setSegments<SEG_ASCII>(buf, true); break;
-    case SEG_1F: setSegments<SEG_1F>(buf, true); break;
-    case SEG_2F: setSegments<SEG_2F>(buf, true); break;
-    case SEG_3F: setSegments<SEG_3F>(buf, true); break;
-    default: setSegments<SEG_BLANK>({0}, true); break;
+  setSegments<SEG_BLANK>({0}, true); // Clear the buffer always
+
+  if(mode == SEG_SNAKE) {
+    // Easter egg time
+    if(__easteregg == 0) { __easteregg = 1; } else { __easteregg = (__easteregg << 1); }
+    errlev = HT16K33::_writeSegments(this->getFQA(), __easteregg, true);
+    I2CIP_ERR_BREAK(errlev);
+  } else {
+
+    // SEG_HEX16, SEG_UINT, SEG_INT, SEG_ASCII, SEG_1F, SEG_2F, SEG_3F
+    // u32 h, u8 b[4], char s[4], float f
+    switch(mode) {
+      case SEG_HEX16: setSegments<SEG_HEX16>(buf, true); break;
+      case SEG_UINT: setSegments<SEG_UINT>(buf, true); break;
+      case SEG_INT: setSegments<SEG_INT>(buf, true); break;
+      case SEG_ASCII: setSegments<SEG_ASCII>(buf, true); break;
+      case SEG_1F: setSegments<SEG_1F>(buf, true); break;
+      case SEG_2F: setSegments<SEG_2F>(buf, true); break;
+      case SEG_3F: setSegments<SEG_3F>(buf, true); break;
+      default: break; // SEG_BLANK handled above
+    }
+    // writeDigitRaw(d, font | (dot << 7));
+    // displaybuffer[d] = (font | ((uint8_t)dot << 7));
+
+    errlev = writeSegments(true);
+    I2CIP_ERR_BREAK(errlev);
   }
-  // writeDigitRaw(d, font | (dot << 7));
-  // displaybuffer[d] = (font | ((uint8_t)dot << 7));
-
-  errlev = writeSegments(false);
-  if(errlev != I2CIP_ERR_NONE) { this->initialized = false; return errlev; }
-
   return blink(HT16K33_BLINK_OFF, false);
 }
 
