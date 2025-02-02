@@ -46,6 +46,7 @@ typedef union {
 class HT16K33 : public I2CIP::Device, public I2CIP::OutputInterface<i2cip_ht16k33_data_t, i2cip_ht16k33_mode_t> {
   I2CIP_DEVICE_CLASS_BUNDLE(HT16K33);
   I2CIP_OUTPUT_USE_FAILSAFE(i2cip_ht16k33_data_t, i2cip_ht16k33_mode_t);
+  I2CIP_OUTPUT_USE_TOSTRING(i2cip_ht16k33_data_t, "%s", HT16K33::segmentsToString(value, getArgsB()));
   private:
     // HT16K33(i2cip_fqa_t fqa) : I2CIP::Device(fqa, i2cip_ht16k33_id_progmem, _id), I2CIP::OutputInterface<uint8_t*, size_t>((I2CIP::Device*)this) { }
     HT16K33(i2cip_fqa_t fqa, const i2cip_id_t& id);
@@ -66,6 +67,41 @@ class HT16K33 : public I2CIP::Device, public I2CIP::OutputInterface<i2cip_ht16k3
     // HT16K33(i2cip_fqa_t fqa, const i2cip_id_t& id); // Moved to private; See I2CIP_HT16K33_ADDRESS note comment
     HT16K33(const uint8_t& wire, const uint8_t& mux, const uint8_t& bus, const i2cip_id_t& id) : HT16K33(I2CIP::createFQA(wire, mux, bus, I2CIP_HT16K33_ADDRESS), id) { }
     HT16K33(const uint8_t& wire, const i2cip_id_t& id) : HT16K33(I2CIP::createFQA(wire, I2CIP_MUX_NUM_FAKE, I2CIP_MUX_BUS_FAKE, I2CIP_HT16K33_ADDRESS), id) { }
+
+    static const char* segmentsToString(const i2cip_ht16k33_data_t& buf, const i2cip_ht16k33_mode_t& mode) {
+      static char s[5] = {'\0'};
+      switch(mode) {
+        case SEG_ASCII:
+          s[0] = buf.h & 0xFF;
+          s[1] = (buf.h >> 8) & 0xFF;
+          s[2] = (buf.h >> 16) & 0xFF;
+          s[3] = (buf.h >> 24) & 0xFF;
+          break;
+        case SEG_HEX16:
+          sprintf(s, "%04X", buf.h);
+          break;
+        case SEG_UINT:
+        case SEG_INT:
+          sprintf(s, "%d", buf.h);
+          break;
+        case SEG_1F:
+          sprintf(s, "%0.1f", buf.f);
+          break;
+        case SEG_2F:
+          sprintf(s, "%0.2f", buf.f);
+          break;
+        case SEG_3F:
+          sprintf(s, "%0.3f", buf.f);
+          break;
+        case SEG_SNAKE:
+          return "SNAKE";
+          break;
+        default:
+          return "BLANK";
+          break;
+      }
+      return s;
+    }
 
     i2cip_errorlevel_t set(i2cip_ht16k33_data_t const& buf, const i2cip_ht16k33_mode_t& mode) override;
 
