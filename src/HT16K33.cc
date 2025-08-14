@@ -235,6 +235,53 @@ char parseSevenSegments(uint8_t b) {
 I2CIP_DEVICE_INIT_STATIC_ID(HT16K33);
 I2CIP_OUTPUT_INIT_FAILSAFE(HT16K33, i2cip_ht16k33_data_t, SEVENSEG_FAILSAFE, i2cip_ht16k33_mode_t, SEG_ASCII);
 
+void HT16K33::parseJSONArgs(I2CIP::i2cip_args_io_t& argsDest, JsonVariant argsA, JsonVariant argsS, JsonVariant argsB) {
+  // Case: String (char[4] cast to uint32_t)
+  if(argsB.is<int>()) {
+    int mode = argsB.as<int>();
+    if(mode >= SEG_BLANK && mode < SEG_SNAKE) {
+      if((argsS.is<int>() || argsS.is<float>()) && (mode == SEG_HEX16 || mode == SEG_UINT || mode == SEG_INT)) {
+        int32_t value = argsS.as<int>();
+        if(value >= 0 && (mode == SEG_HEX16 || mode == SEG_UINT)) {
+          argsDest.s = new i2cip_ht16k33_data_t{ .h = (uint32_t)value };
+          argsDest.b = new i2cip_ht16k33_mode_t((i2cip_ht16k33_mode_t)mode);
+        } else if(mode == SEG_INT) {
+          argsDest.s = new i2cip_ht16k33_data_t{ .h = ((uint32_t)value) | (value < 0 ? 0x80000000 : 0) }; // Sign conversion
+          argsDest.b = new i2cip_ht16k33_mode_t((i2cip_ht16k33_mode_t)mode);
+        }
+      } else if (argsS.is<float>() && (mode == SEG_1F || mode == SEG_2F || mode == SEG_3F)) {
+        // Floating point numbers
+        argsDest.s = new float(argsS.as<float>());
+        argsDest.b = new i2cip_ht16k33_mode_t((i2cip_ht16k33_mode_t)mode);
+      } else if (mode == SEG_BLANK) {
+        // Blank
+        argsDest.s = new i2cip_ht16k33_data_t{ .h = 0 };
+        argsDest.b = new i2cip_ht16k33_mode_t(SEG_BLANK);
+      } else {
+        // String
+        String s = argsS.as<String>(); // This works for any argsS, even null
+        if(s.length() < 4) {
+          do {
+            s = ' ' + s; // Left-pad with spaces
+          } while(s.length() < 4);
+        } else if(s.length() > 4) {
+          s = s.substring(0, 4); // Truncate to 4 characters
+        }
+        // Convert to uint32_t (little-endian)
+        const char* str = s.c_str();
+        argsDest.s = new i2cip_ht16k33_data_t{ .h = (uint32_t)(str[3] << 24 | str[2] << 16 | str[1] << 8 | str[0]) };
+        argsDest.b = new i2cip_ht16k33_mode_t(SEG_ASCII);
+        return;
+      }
+    }
+  }
+}
+
+void HT16K33::deleteArgs(I2CIP::i2cip_args_io_t& args) {
+  delete((i2cip_ht16k33_data_t*)args.s);
+  delete((i2cip_ht16k33_mode_t*)args.b);
+}
+
 using namespace I2CIP;
 
 // use begin
@@ -250,9 +297,9 @@ HT16K33::HT16K33(i2cip_fqa_t fqa, const i2cip_id_t& id) : Device(fqa, id), Outpu
 // The last three handle floating point numbers with varying degrees of precision
 
 template <> void HT16K33::setSegments<SEG_BLANK>(i2cip_ht16k33_data_t buf, bool overwrite) {
-  #ifdef I2CIP_DEBUG_SERIAL
-    I2CIP_DEBUG_SERIAL.println("BLANK");
-  #endif
+  // #ifdef I2CIP_DEBUG_SERIAL
+  //   I2CIP_DEBUG_SERIAL.println("BLANK");
+  // #endif
   if(!overwrite) return;
   SEVENSEG_SET_BLANK(0);
   SEVENSEG_SET_BLANK(1);
