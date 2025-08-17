@@ -344,9 +344,9 @@ template <> void HT16K33::setSegments<SEG_UINT>(i2cip_ht16k33_data_t buf, bool o
     return;
   }
 
-  uint8_t thousands = val > 1000 ? val / 1000 : 0;
-  uint8_t hundreds = val > 100 ? (val - (thousands * 1000)) / 100 : 0;
-  uint8_t tens = val > 10 ? (val - (thousands * 1000) - (hundreds * 100)) / 10 : 0;
+  uint8_t thousands = val >= 1000 ? val / 1000 : 0;
+  uint8_t hundreds = val >= 100 ? (val - (thousands * 1000)) / 100 : 0;
+  uint8_t tens = val >= 10 ? (val - (thousands * 1000) - (hundreds * 100)) / 10 : 0;
   uint8_t ones = val - (thousands * 1000) - (hundreds * 100) - (tens * 10);
 
   // if the second byte is non-zero, display a minus sign - because why not? - otherwise a space
@@ -383,8 +383,8 @@ template <> void HT16K33::setSegments<SEG_INT>(i2cip_ht16k33_data_t buf, bool ov
   val = abs(val);
 
   uint8_t thousands = sign ? 0 : (val > 1000 ? val / 1000 : 0);
-  uint8_t hundreds = val > 100 ? (val - (thousands * 1000)) / 100 : 0;
-  uint8_t tens = val > 10 ? (val - (thousands * 1000) - (hundreds * 100)) / 10 : 0;
+  uint8_t hundreds = val >= 100 ? (val - (thousands * 1000)) / 100 : 0;
+  uint8_t tens = val >= 10 ? (val - (thousands * 1000) - (hundreds * 100)) / 10 : 0;
   uint8_t ones = val - (thousands * 1000) - (hundreds * 100) - (tens * 10);
 
   // if the second byte is non-zero, display a minus sign - because why not? - otherwise a space
